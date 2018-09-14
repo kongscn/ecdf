@@ -7,5 +7,5 @@ build/
 dist/
 *.egg-info/
 
-.ipynb
+*.ipynb
 .ipynb_checkpoints/
