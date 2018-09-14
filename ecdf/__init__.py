@@ -1,4 +1,9 @@
 """
+ecdf
+====
+
+Visualize dataframes with echarts.
+
 """
 
 __all__ = [
@@ -515,11 +520,10 @@ def ecplot(self, kind='line', title='', orient='v', **kwargs):
     return ec.plot(kind=kind, **kwargs)
 
 
-# try:
-#     import pandas as pd
-#     if not hasattr(pd.DataFrame, 'ecplot'):
-#         pd.DataFrame.ecplot = ecplot
-#     if not hasattr(pd.Series, 'ecplot'):
-#         pd.Series.ecplot = ecplot
-# except Exception:
-#     pass
+try:
+    import pandas as pd
+    if not hasattr(pd.DataFrame, 'ecplot'):
+        pd.DataFrame.ecplot = ecplot
+        pd.Series.ecplot = ecplot
+except Exception:
+    pass
