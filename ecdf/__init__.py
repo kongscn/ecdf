@@ -6,8 +6,10 @@ Visualize dataframes with echarts.
 
 """
 
+__version__ = '0.2'
+
 __all__ = [
-    'Echart'
+    'Echart',
 ]
 
 import math
@@ -292,6 +294,10 @@ class Echart:
         }
         return funcs[kind](*args, **kwargs)
 
+    def scatter(self, y=None, x=None, **kwargs):
+        self.add_series('scatter', y, x, **kwargs)
+        return self
+
     def line(self, y=None, x=None, reference=False, **kwargs):
         if reference:
             kwargs = update_dict_({'lineStyle': {'type': 'dashed', 'width': 1}, 'z':1}, kwargs)
@@ -513,6 +519,10 @@ class Echart:
         div = DIV_ELEMENT.format(eid=eid, width=width, height=height)
         script = OPTION_ELEMENT.format(eid=eid, option=self.json)
         return '\n'.join([div, script])
+
+    def display(self):
+        from IPython.core.display import display, Javascript
+        return display(Javascript(self._repr_javascript_()))
 
 
 def ecplot(self, kind='line', title='', orient='v', **kwargs):
