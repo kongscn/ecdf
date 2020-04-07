@@ -291,6 +291,7 @@ class Echart:
             'line': self.line,
             'bar': self.bar,
             'area': self.area,
+            'scatter': self.scatter,
         }
         return funcs[kind](*args, **kwargs)
 
