@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="ecdf",
-    version="0.2",
+    version="0.3",
     author="Shel Kong",
     author_email="kongscn@gmail.com",
     description="Visualize dataframes with echarts",
