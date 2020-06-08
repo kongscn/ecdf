@@ -2,6 +2,7 @@
 
 Visualize pandas [**d**ata**f**rames](https://github.com/pandas-dev/pandas) with [**ec**harts](http://echarts.baidu.com/).
 
+![a ecdf demo](https://raw.githubusercontent.com/kongscn/ecdf/master/doc/demo.png)
 
 
 Note:
