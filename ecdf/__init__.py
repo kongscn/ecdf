@@ -91,7 +91,7 @@ def nb():
         """
     require.config({
         paths: {
-            echarts: "https://cdn.bootcss.com/echarts/4.1.0/echarts.min"
+            echarts: "https://cdn.jsdelivr.net/npm/echarts@4.1.0/dist/echarts.min"
         }
     });
     """
