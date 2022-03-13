@@ -516,7 +516,9 @@ class Echart:
         jsons = []
         for dataset in self.datasets:
             json = dataset.to_json(
-                double_precision=self.double_precision, orient="split"
+                double_precision=self.double_precision,
+                orient="split",
+                force_ascii=False,
             )
             json = json.replace('"columns":', '"dimensions":').replace(
                 '"data":', '"source":'
