@@ -148,7 +148,10 @@ class Echart:
         option = {
             "dataset": ["{{dataset}}"],
             "series": [],
-            "title": {"text": title, "subtext": subtitle,},
+            "title": {
+                "text": title,
+                "subtext": subtitle,
+            },
             "legend": {"left": "right"},
             "dataZoom": [],
             "animation": False,
@@ -159,7 +162,9 @@ class Echart:
                     "type": "cross",
                     "animation": False,
                     "snap": False,
-                    "label": {"backgroundColor": "#505765",},
+                    "label": {
+                        "backgroundColor": "#505765",
+                    },
                 },
             },
         }
@@ -329,7 +334,9 @@ class Echart:
         else:
             _cfg = {
                 "symbol": "none",
-                "lineStyle": {"width": 2,},
+                "lineStyle": {
+                    "width": 2,
+                },
                 "smooth": True,
                 "sampling": "average",
             }
@@ -477,7 +484,10 @@ class Echart:
                 "textAlign": "center",
                 "top": pct(top(idx, nrows, ncols, 0) + 0.01),
                 "left": pct(left(idx, ncols) + width / 2),
-                "textStyle": {"fontSize": 12, "fontWeight": "normal",},
+                "textStyle": {
+                    "fontSize": 12,
+                    "fontWeight": "normal",
+                },
             }
             update_dict_(_title, title_kwargs)
             self.add_component("grid", append=True, **_grid)
@@ -508,8 +518,8 @@ class Echart:
             json = dataset.to_json(
                 double_precision=self.double_precision, orient="split"
             )
-            json = json.replace('"columns":', "dimensions:").replace(
-                '"data":', "source:"
+            json = json.replace('"columns":', '"dimensions":').replace(
+                '"data":', '"source":'
             )
             jsons.append(json)
         return ",".join(jsons)
