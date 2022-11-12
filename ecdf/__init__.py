@@ -10,11 +10,14 @@ __version__ = "0.5.1"
 
 __all__ = [
     "Echart",
+    "calc_ylim",
+    "calc_minval",
 ]
 
 import math
 import json
 import uuid
+from typing import Tuple
 
 import numpy as np
 import pandas as pd
@@ -52,6 +55,38 @@ def update_dict_(base, updates):
         else:
             base[k] = v
     return base
+
+
+def nearer(a, digits=3) -> float:
+    """"""
+    a = a * 0.9
+    m = 10 ** (math.floor(math.log10(math.fabs(a))))
+    v = a / m
+    m2 = 10 ** (digits - 1)
+    v2 = math.trunc(v * m2) / m2
+    rr = math.copysign(v2 * m, a)
+    return float("{:.3g}".format(rr))
+
+
+def calc_ylim(data, digits=3) -> Tuple[float, float]:
+    """计算合适的y轴取值范围，使得line波动占据大部分图表范围"""
+    min, max = np.nanmin(data), np.nanmax(data)
+    ymin, ymax = None, None
+
+    if min > 0:
+        if (max - min) / min <= 1:
+            ymin = nearer(min, digits=digits)
+    elif max < 0:
+        if (min - max) / min <= 1:
+            ymax = nearer(max, digits=digits)
+    return ymin, ymax
+
+
+def calc_minval(a, digits=3):
+    """用于计算echarts中y轴取值下限范围"""
+    if a < 0:
+        return a
+    return nearer(a, digits=digits)
 
 
 # def edge(idx: int, nrows: int, ncols: int):
@@ -275,6 +310,24 @@ class Echart:
         self.add_component("yAxis", append=True, **options)
         return len(self.yAxis) - 1
 
+    def link(self, axis=None, index="all"):
+        """link axis
+
+        Parameters
+        ----------
+        axis: str
+            x or y
+        index: str or [int]
+            axis index to link
+
+        """
+        if axis is not None:
+            opts = {
+                "link": {"{}AxisIndex".format(axis): index},
+            }
+            self._option["axisPointer"] = opts
+        return self
+
     def add_series(self, kind: str, y=None, x: str = None, datasetIndex=None, **kwargs):
         if y is None:
             exists = [s["name"] for s in self._option["series"]]
@@ -369,10 +422,7 @@ class Echart:
         df = self.data
         by = df.pop(col)
         ncols = min(ncols, len(set(by)))
-        if link is not None:
-            if link == "h":
-                link = "x" if link == "y" else "y"
-            self._option["axisPointer"] = {"link": {f"{link}AxisIndex": "all"}}
+        self.link(axis=link)
 
         datasets = []
         nrows = math.ceil(len(set(by)) / ncols)
@@ -428,20 +478,31 @@ class Echart:
         ncols: int = 5,
         align: str = "y",
         refval=None,
+        link=None,
+        secondary_ref=False,
         series_kwargs=None,
         grid_kwargs=None,
         xAxis_kwargs=None,
         yAxis_kwargs=None,
         title_kwargs=None,
     ):
+        self.link(axis=link)
         if align is None:
             align = ""
+
+        ignore_cols = [self.x]
         if refval is not None:
-            refcol = "__refval__"
-            self.data[refcol] = refval
+            if isinstance(refval, str):
+                # column name
+                refcol = refval
+            else:
+                # a universal reference value
+                refcol = "__refval__"
+                self.data[refcol] = refval
+            ignore_cols.append(refcol)
 
         if columns is None:
-            columns = [col for col in self.data.columns if col not in (self.x, refcol)]
+            columns = [col for col in self.data.columns if col not in ignore_cols]
         minv = np.nanmin(self.data[columns].values)
         maxv = np.nanmax(self.data[columns].values)
         nrows = math.ceil(len(columns) / ncols)
@@ -474,9 +535,9 @@ class Echart:
                 "show": False,
                 "gridIndex": idx,
             }
-            if "y" in align:
-                _yAxis["min"] = minv
-                _yAxis["max"] = maxv
+            if "y" not in align:
+                minv, maxv = calc_ylim(self.data[col])
+
             update_dict_(_yAxis, yAxis_kwargs)
 
             _title = {
@@ -492,18 +553,28 @@ class Echart:
             update_dict_(_title, title_kwargs)
             self.add_component("grid", append=True, **_grid)
             self.add_component("xAxis", append=True, **_xAxis)
-            self.add_component("yAxis", append=True, **_yAxis)
+            self.add_component("yAxis", append=True, **_yAxis, min=minv, max=maxv)
             self.add_component("title", append=True, **_title)
             self.update_component("legend", show=False)
             _series = {
                 "xAxisIndex": idx,
-                "yAxisIndex": idx,
+                "yAxisIndex": len(self.yAxis) - 1,
                 "showSymbol": False,
+                "smooth": True,
+                "tooltip": {"show": False},
             }
             update_dict_(_series, series_kwargs)
             self.plot(kind, y=col, **_series)
             if refcol is not None:
+                if secondary_ref:
+                    _rymin, _rymax = calc_ylim(self.data[refcol])
+                    self.add_component(
+                        "yAxis", append=True, **_yAxis, min=_rymin, max=_rymax
+                    )
+                    _series["yAxisIndex"] = len(self.yAxis) - 1
                 _series["reference"] = True
+                _series["tooltip"] = {"show": False}
+                _series["lineStyle"] = {"color": "#D3D3D3"}
                 self.plot(kind, y=refcol, **_series)
         return self
 
