@@ -17,7 +17,7 @@ __all__ = [
 import math
 import json
 import uuid
-from typing import Tuple
+from typing import Tuple, List
 
 import numpy as np
 import pandas as pd
@@ -115,7 +115,7 @@ def pct(val):
     return "{:.2%}".format(val)
 
 
-def nb():
+def nb(version="5.4.0"):
     """
     Inject Javascript to notebook, default using local js.
     This function must be last executed in a cell to produce the Javascript in the output cell
@@ -124,12 +124,14 @@ def nb():
 
     js = Javascript(
         """
-    require.config({
-        paths: {
-            echarts: "https://cdn.jsdelivr.net/npm/echarts@4.1.0/dist/echarts.min"
-        }
-    });
-    """
+        require.config({
+            paths: {
+                echarts: "https://cdn.jsdelivr.net/npm/echarts@{version}/dist/echarts.min"
+            }
+        });
+        """.format(
+            version=version
+        )
     )
     return js
 
@@ -415,6 +417,55 @@ class Echart:
         }
         update_dict_(styles, kwargs)
         self.add_series("line", y, x=x, **styles)
+        return self
+
+    def _gen_sankey_nodes(self, link_cols):
+        nodes = []
+        df = self.datasets[0].dropna()
+        for col in link_cols:
+            _nodes = list(df[col].unique())
+            print(len(_nodes))
+            nodes += _nodes
+        if len(nodes) != len(set(nodes)):
+            msg = "mapping data contains duplicated nodes in different levels"
+            raise ValueError(msg)
+        return [{"name": n} for n in nodes]
+
+    def _gen_sankey_links(self, link_cols, vcol):
+        df = self.datasets[0].dropna()
+        links = []
+        for (scol, tcol) in zip(link_cols[:-1], link_cols[1:]):
+            stat = df.groupby(tcol).agg({scol: "first", vcol: "sum"})
+            print(stat[vcol].sum())
+            for t, (s, v) in stat.iterrows():
+                links.append(
+                    {
+                        "source": s,
+                        "target": t,
+                        "value": v,
+                    }
+                )
+        return links
+
+    def sankey(self, link_cols: List[str], vcol: str):
+        """Sankey plot
+
+        Parameters
+        ----------
+        link_cols:
+            column names used to generate links
+        vcol:
+            value column name
+        """
+        series = {
+            "type": "sankey",
+        }
+        data = self._gen_sankey_nodes(link_cols)
+        links = self._gen_sankey_links(link_cols, vcol)
+        series["data"] = data
+        series["links"] = links
+        self._option["series"] = series
+        del self._option["dataset"]
         return self
 
     def by(self, col, ncols=3, link=None, spaces=(0.05, 0.03, 0.25)):
