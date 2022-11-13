@@ -9,3 +9,6 @@ dist/
 
 *.ipynb
 .ipynb_checkpoints/
+
+*.log
+*.json
