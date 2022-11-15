@@ -6,7 +6,7 @@ Visualize dataframes with echarts.
 
 """
 
-__version__ = "0.6.0"
+__version__ = "0.6.1"
 
 __all__ = [
     "Echart",
@@ -126,12 +126,11 @@ def nb(version="5.4.0"):
         """
         require.config({
             paths: {
-                echarts: "https://cdn.jsdelivr.net/npm/echarts@{version}/dist/echarts.min"
+                echarts: "https://cdn.jsdelivr.net/npm/echarts@%s/dist/echarts.min"
             }
         });
-        """.format(
-            version=version
-        )
+        """
+        % version
     )
     return js
 
