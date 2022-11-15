@@ -6,7 +6,7 @@ Visualize dataframes with echarts.
 
 """
 
-__version__ = "0.6.1"
+__version__ = "0.7.0"
 
 __all__ = [
     "Echart",
@@ -21,29 +21,6 @@ from typing import Tuple, List
 
 import numpy as np
 import pandas as pd
-
-
-APPEND_ELEMENT = """
-    $('#{eid}').attr('id','{eid}'+'_old');
-    element.append('<div id="{eid}" style="width: {width}px;height:{height}px;page-break-inside: avoid;"></div>');
-    """
-
-FUNC_ELEMENT = """require(['echarts'],
-    function(echarts){
-        var myChart = echarts.init(document.getElementById("%s"),"");
-        var option = %s;
-        myChart.setOption(option);
-    });
-    """
-
-DIV_ELEMENT = '<div id="{eid}" class="ecdf" style="width:{width};height:{height};page-break-inside:avoid;"></div>'
-
-OPTION_ELEMENT = """<script type="text/javascript">
-    var myChart = echarts.init(document.getElementById("{eid}"),"");
-    var option = {option};
-    myChart.setOption(option);
-</script>
-"""
 
 
 def update_dict_(base, updates):
@@ -122,16 +99,8 @@ def nb(version="5.4.0"):
     """
     from IPython.display import Javascript
 
-    js = Javascript(
-        """
-        require.config({
-            paths: {
-                echarts: "https://cdn.jsdelivr.net/npm/echarts@%s/dist/echarts.min"
-            }
-        });
-        """
-        % version
-    )
+    url = "https://cdn.jsdelivr.net/npm/echarts@{}/dist/echarts.min".format(version)
+    js = Javascript('require.config({paths: {echarts: "%s"}});' % url)
     return js
 
 
@@ -153,6 +122,8 @@ class Echart:
         ytype="value",
         orient="v",
         double_precision=3,
+        theme="",
+        themev4_var=False,
     ):
         data = data.copy()
         if data.index.name is None:
@@ -180,6 +151,29 @@ class Echart:
         self.height = height
         self.orient = orient
         self.double_precision = double_precision
+
+        self.theme = theme
+        if themev4_var:
+            themev4_expr = """
+            var themeEC4 = {
+                color: [
+                    '#c23531',
+                    '#2f4554',
+                    '#61a0a8',
+                    '#d48265',
+                    '#91c7ae',
+                    '#749f83',
+                    '#ca8622',
+                    '#bda29a',
+                    '#6e7074',
+                    '#546570',
+                    '#c4ccd3'
+                ]
+            };
+            """
+        else:
+            themev4_expr = ""
+        self.themev4_expr = themev4_expr
 
         option = {
             "dataset": ["{{dataset}}"],
@@ -673,29 +667,51 @@ class Echart:
         visible = {col: True if col in selected else False for col in cols}
         self.update_component("legend", selected=visible)
 
+    def _get_repr_js(self, eid=None):
+        if eid is None:
+            eid = str(uuid.uuid4())
+
+        TEMPLATE = """
+        {themev4_expr}
+        var myChart = echarts.init(document.getElementById("{eid}"), {theme});
+        var option = {option};
+        myChart.setOption(option);
+        """
+        return TEMPLATE.format(
+            themev4_expr=self.themev4_expr, eid=eid, theme=self.theme, option=self.json
+        )
+
     def _repr_javascript_(self):
+        APPEND_ELEMENT = """
+            $('#{eid}').attr('id','{eid}'+'_old');
+            element.append('<div id="{eid}" style="width: {width}px;height:{height}px;page-break-inside: avoid;"></div>');
+        """
+        FUNC_ELEMENT = "require(['echarts'], function(echarts){%s});"
+
         eid = str(uuid.uuid4())
         prep = APPEND_ELEMENT.format(eid=eid, width=self.width, height=self.height)
-        func = FUNC_ELEMENT % (eid, self.json)
+        content = self._get_repr_js(eid=eid)
+        func = FUNC_ELEMENT % content
         return "".join([prep, func])
 
     def js(self, eid=None):
-        if eid is None:
-            eid = str(uuid.uuid4())
-        script = OPTION_ELEMENT.format(eid=eid, option=self.json)
+        TEMPLATE = '<script type="text/javascript">{}</script>'
+        content = self._get_repr_js(eid=eid)
+        script = TEMPLATE.format(content)
         return script
 
     def div(self, eid=None, width="100%", height="90%"):
         if eid is None:
             eid = str(uuid.uuid4())
-        div = DIV_ELEMENT.format(eid=eid, width=width, height=height)
-        script = OPTION_ELEMENT.format(eid=eid, option=self.json)
+        TEMPLATE = '<div id="{eid}" class="ecdf" style="width:{width};height:{height};page-break-inside:avoid;"></div>'
+        div = TEMPLATE.format(eid=eid, width=width, height=height)
+        script = self.js(eid=eid)
         return "\n".join([div, script])
 
-    def display(self):
+    def display(self, **kwargs):
         from IPython.core.display import display, Javascript
 
-        return display(Javascript(self._repr_javascript_()))
+        return display(Javascript(self._repr_javascript_(**kwargs)))
 
 
 def ecplot(
@@ -707,6 +723,8 @@ def ecplot(
     xlim=None,
     ylim=None,
     ytype="value",
+    theme="",
+    themev4_var=False,
     **kwargs,
 ):
     ec = Echart(
@@ -717,13 +735,13 @@ def ecplot(
         xlim=xlim,
         ylim=ylim,
         ytype=ytype,
+        theme=theme,
+        themev4_var=themev4_var,
     )
     return ec.plot(kind=kind, **kwargs)
 
 
 try:
-    import pandas as pd
-
     if not hasattr(pd.DataFrame, "ecplot"):
         pd.DataFrame.ecplot = ecplot
         pd.Series.ecplot = ecplot
