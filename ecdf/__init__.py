@@ -80,12 +80,22 @@ def calc_minval(a, digits=3):
 #     return edges
 
 
-def left(idx: int, ncols: int, space: float = 0.01):
-    return (idx % ncols) / ncols + space
+# def left(idx: int, ncols: int, space: float = 0.01):
+#     return (idx % ncols) / ncols + space
 
 
-def top(idx: int, nrows: int, ncols: int, space: float = 0.1):
-    return idx // ncols / nrows + space
+# def top(idx: int, nrows: int, ncols: int, space: float = 0.1):
+#     return idx // ncols / nrows + space
+
+
+def left(idx: int, ncols: int, offset=0.0, space: float = 0.0):
+    cidx = idx % ncols
+    return offset + (1 - offset) * (cidx / ncols) + space
+
+
+def top(idx: int, nrows: int, ncols: int, offset=0.0, space: float = 0.0):
+    ridx = idx // ncols
+    return offset + (1 - offset) * (ridx / nrows) + space
 
 
 def pct(val):
@@ -392,6 +402,9 @@ class Echart:
         self.add_series("line", y, x, **kwargs)
         return self
 
+    def step(self, y=None, x=None, step="left", **kwargs):
+        return self.line(y=y, x=x, step=step, **kwargs)
+
     def bar(self, y=None, x=None, **kwargs):
         if self.orient == "h":
             fun = self.update_yAxis
@@ -427,7 +440,7 @@ class Echart:
     def _gen_sankey_links(self, link_cols, vcol):
         df = self.datasets[0].dropna()
         links = []
-        for (scol, tcol) in zip(link_cols[:-1], link_cols[1:]):
+        for scol, tcol in zip(link_cols[:-1], link_cols[1:]):
             stat = df.groupby(tcol).agg({scol: "first", vcol: "sum"})
             print(stat[vcol].sum())
             for t, (s, v) in stat.iterrows():
@@ -461,7 +474,16 @@ class Echart:
         del self._option["dataset"]
         return self
 
-    def by(self, col, ncols=3, link=None, spaces=(0.05, 0.03, 0.25)):
+    def by(self, col, ncols=3, link=None, spaces=(0.06, 0.01, 0.25)):
+        """
+        Parameters
+        ----------
+        spaces: tuple
+            tuple for (grid space, title space, title offset):
+            grid space: space between grids, left for grid title
+            title top: title top offset in each grid
+            title left: title left offset in each grid
+        """
         self.ys = [c for c in self.ys if c != col]
         df = self.data
         by = df.pop(col)
@@ -470,8 +492,8 @@ class Echart:
 
         datasets = []
         nrows = math.ceil(len(set(by)) / ncols)
-        width = 0.95 / ncols
-        height = 0.9 / nrows
+        width = 1.0 / ncols
+        height = (1 - 0.05) / nrows - spaces[0]  # excluding title spaces
         xo = self.xAxis[0]
         yo = self.yAxis[0]
 
@@ -480,7 +502,7 @@ class Echart:
         for g, _df in df.groupby(by):
             datasets.append(_df)
             _grid = {
-                "top": pct(top(idx, nrows, ncols, space=spaces[0])),
+                "top": pct(top(idx, nrows, ncols, space=spaces[0], offset=0.05)),
                 "left": pct(left(idx, ncols, space=0.0)),
                 "width": pct(width),
                 "height": pct(height),
@@ -494,10 +516,10 @@ class Echart:
 
             _title = {
                 "text": f"{col}={g}",
-                "top": pct(top(idx, nrows, ncols, space=spaces[1])),
+                "top": pct(top(idx, nrows, ncols, space=spaces[1], offset=0.05)),
                 "left": pct(left(idx, ncols) + width * spaces[2]),
                 "textStyle": {
-                    # 'fontSize': 12,
+                    "fontSize": 12,
                     "align": "left",
                     "fontWeight": "normal",
                 },
@@ -529,6 +551,7 @@ class Echart:
         xAxis_kwargs=None,
         yAxis_kwargs=None,
         title_kwargs=None,
+        space=0.05,
     ):
         self.link(axis=link)
         if align is None:
@@ -550,7 +573,6 @@ class Echart:
         minv = np.nanmin(self.data[columns].values)
         maxv = np.nanmax(self.data[columns].values)
         nrows = math.ceil(len(columns) / ncols)
-        space = 0.01
         width = 1 / ncols - space
         height = 1 / nrows - space
         self.remove_components(["grid", "xAxis", "yAxis", "title"])
@@ -666,6 +688,7 @@ class Echart:
             cols = set([s["name"] for s in self._option["series"]])
         visible = {col: True if col in selected else False for col in cols}
         self.update_component("legend", selected=visible)
+        return self
 
     def _get_repr_js(self, eid=None):
         if eid is None:
