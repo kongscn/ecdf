@@ -387,7 +387,12 @@ class Echart:
     def line(self, y=None, x=None, reference=False, **kwargs):
         if reference:
             kwargs = update_dict_(
-                {"lineStyle": {"type": "dashed", "width": 1}, "z": 1}, kwargs
+                {
+                    "symbol": "none",
+                    "lineStyle": {"type": "dashed", "width": 1, "color": "#8d98b3"},
+                    "z": 1,
+                },
+                kwargs,
             )
         else:
             _cfg = {
@@ -492,7 +497,7 @@ class Echart:
 
         datasets = []
         nrows = math.ceil(len(set(by)) / ncols)
-        width = 1.0 / ncols
+        width = (1.0 - 0.05) / ncols
         height = (1 - 0.05) / nrows - spaces[0]  # excluding title spaces
         xo = self.xAxis[0]
         yo = self.yAxis[0]
