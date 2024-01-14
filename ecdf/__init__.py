@@ -45,6 +45,20 @@ def nearer(a, digits=3) -> float:
     return float("{:.3g}".format(rr))
 
 
+def nearer2(a, digits=3, direction="down"):
+    d = math.floor(math.log10(math.fabs(a)))
+    b = a / 10**d * 10 ** (digits - 1)
+    if direction == "up":
+        b = math.ceil(b)
+    elif direction == "down":
+        b = math.floor(b)
+    else:
+        raise ValueError("direction must be up or down")
+    c = b * 10 ** (d - (digits - 1))
+    c = float("{:.3g}".format(c))
+    return c
+
+
 def calc_ylim(data, digits=3) -> Tuple[float, float]:
     """计算合适的y轴取值范围，使得line波动占据大部分图表范围"""
     min, max = np.nanmin(data), np.nanmax(data)
@@ -56,6 +70,18 @@ def calc_ylim(data, digits=3) -> Tuple[float, float]:
     elif max < 0:
         if (min - max) / min <= 1:
             ymax = nearer(max, digits=digits)
+    return ymin, ymax
+
+
+def calc_ylim2(data, digits=3) -> Tuple[float, float]:
+    """计算合适的y轴取值范围，使得line波动占据大部分图表范围
+    一定返回确定值，不依赖于自动机制，便于多个图标共享范围
+    """
+    min, max = np.nanmin(data), np.nanmax(data)
+
+    ymin = nearer2(min, digits=digits, direction="down")
+    ymax = nearer2(max, digits=digits, direction="up")
+
     return ymin, ymax
 
 
@@ -479,7 +505,7 @@ class Echart:
         del self._option["dataset"]
         return self
 
-    def by(self, col, ncols=3, link=None, spaces=(0.06, 0.01, 0.25)):
+    def by(self, col, ncols=3, link=None, spaces=(0.06, 0.01, 0.25), sig=3, title=True):
         """
         Parameters
         ----------
@@ -502,6 +528,11 @@ class Echart:
         xo = self.xAxis[0]
         yo = self.yAxis[0]
 
+        if link == "y":
+            minv, maxv = calc_ylim2(df[self.ys], digits=sig)
+            yo["min"] = minv
+            yo["max"] = maxv
+
         idx = 0
         self.remove_components(["grid", "xAxis", "yAxis", "title"])
         for g, _df in df.groupby(by):
@@ -519,16 +550,6 @@ class Echart:
                 "containLabel": True,
             }
 
-            _title = {
-                "text": f"{col}={g}",
-                "top": pct(top(idx, nrows, ncols, space=spaces[1], offset=0.05)),
-                "left": pct(left(idx, ncols) + width * spaces[2]),
-                "textStyle": {
-                    "fontSize": 12,
-                    "align": "left",
-                    "fontWeight": "normal",
-                },
-            }
             _x = xo.copy()
             _x["gridIndex"] = idx
             _y = yo.copy()
@@ -537,7 +558,19 @@ class Echart:
             self.add_component("grid", append=True, **_grid)
             self.add_component("xAxis", append=True, **_x)
             self.add_component("yAxis", append=True, **_y)
-            self.add_component("title", append=True, **_title)
+
+            if title:
+                _title = {
+                    "text": f"{col}={g}",
+                    "top": pct(top(idx, nrows, ncols, space=spaces[1], offset=0.05)),
+                    "left": pct(left(idx, ncols) + width * spaces[2]),
+                    "textStyle": {
+                        "fontSize": 12,
+                        "align": "left",
+                        "fontWeight": "normal",
+                    },
+                }
+                self.add_component("title", append=True, **_title)
             idx += 1
         self.datasets = datasets
         return self
