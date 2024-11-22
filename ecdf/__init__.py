@@ -46,6 +46,8 @@ def nearer(a, digits=3) -> float:
 
 
 def nearer2(a, digits=3, direction="down"):
+    if np.isclose(a, 0.0):
+        return 0.0
     d = math.floor(math.log10(math.fabs(a)))
     b = a / 10**d * 10 ** (digits - 1)
     if direction == "up":
