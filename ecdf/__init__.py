@@ -19,8 +19,10 @@ import json
 import uuid
 from typing import Tuple, List
 
+import dateutil
 import numpy as np
 import pandas as pd
+from pandas.api.types import is_datetime64_any_dtype as is_datetime
 
 
 def update_dict_(base, updates):
@@ -172,6 +174,8 @@ class Echart:
             data = data.to_frame(name)
         data.columns = list(map(str, data.columns))
         ys = list(data.columns)
+        if is_datetime(data.index.dtype) and data.index.tz is None:
+            data.index = data.index.tz_localize(dateutil.tz.tzlocal())
         data = data.reset_index()
         if xtype is None:
             dtype = data[x].dtype.name
