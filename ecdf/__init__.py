@@ -179,7 +179,7 @@ class Echart:
         data = data.reset_index()
         if xtype is None:
             dtype = data[x].dtype.name
-            if dtype == "datetime64[ns]":
+            if dtype.startswith("datetime64[ns"):
                 xtype = "time"
             elif dtype.startswith("float"):
                 xtype = "value"
