@@ -11,6 +11,7 @@ __version__ = "0.8.0"
 __all__ = [
     "Echart",
     "calc_ylim",
+    "calc_ylim2",
     "calc_minval",
 ]
 
@@ -646,7 +647,7 @@ class Echart:
                 "gridIndex": idx,
             }
             if "y" not in align:
-                minv, maxv = calc_ylim(self.data[col])
+                minv, maxv = calc_ylim2(self.data[col])
 
             update_dict_(_yAxis, yAxis_kwargs)
 
@@ -677,7 +678,7 @@ class Echart:
             self.plot(kind, y=col, **_series)
             if refcol is not None:
                 if secondary_ref:
-                    _rymin, _rymax = calc_ylim(self.data[refcol])
+                    _rymin, _rymax = calc_ylim2(self.data[refcol])
                     self.add_component(
                         "yAxis", append=True, **_yAxis, min=_rymin, max=_rymax
                     )
