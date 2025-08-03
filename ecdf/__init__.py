@@ -912,8 +912,13 @@ def ecplot(
     ytype="value",
     theme="",
     themev4_var=False,
+    secondary_y: str|list[str]|None=None,
     **kwargs,
 ):
+    secondary_y = secondary_y or []
+    if isinstance(secondary_y, str):
+        secondary_y = [secondary_y]
+    
     ec = Echart(
         self,
         title=title,
@@ -925,8 +930,15 @@ def ecplot(
         theme=theme,
         themev4_var=themev4_var,
     )
-    return ec.plot(kind=kind, **kwargs)
 
+    ys = [y for y in ec.ys if y not in secondary_y]
+    ec.plot(kind=kind, y=ys, **kwargs)
+
+    if secondary_y:
+        axis = ec.add_yAxis(type="value", position="right")
+        ec.plot(kind=kind, y=secondary_y, yAxisIndex=axis, **kwargs)
+
+    return ec
 
 try:
     if not hasattr(pd.DataFrame, "ecplot"):
