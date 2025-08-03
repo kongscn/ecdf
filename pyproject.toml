@@ -13,6 +13,7 @@ dependencies = [
   "python-dateutil ~= 2.8",
   "numpy",
   "pandas",
+  "loguru",
 ]
 license = {file = "LICENSE"}
 classifiers = [

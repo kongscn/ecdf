@@ -2,7 +2,7 @@
 
 build:
 	rm -rf dist
-	python -m build
+	uv build
 
 upload:
-	twine upload dist/* --repository ecdf
+	uv publish

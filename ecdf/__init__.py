@@ -6,9 +6,11 @@ Visualize dataframes with echarts.
 
 """
 
-__version__ = "0.8.0"
+__version__ = "0.9.0"
 
 __all__ = [
+    "nb",
+    "detect_environment",
     "Echart",
     "calc_ylim",
     "calc_ylim2",
@@ -24,6 +26,44 @@ import dateutil
 import numpy as np
 import pandas as pd
 from pandas.api.types import is_datetime64_any_dtype as is_datetime
+from loguru import logger
+
+
+def detect_environment() -> str:
+    """
+    Detect the environment of the current notebook.
+    """
+    try:
+        # Check if we're in IPython (base for Jupyter)
+        from IPython import get_ipython
+        ipython = get_ipython()
+        
+        if ipython is None:
+            return "python"
+        
+        # Check the IPython class name to distinguish environments
+        class_name = ipython.__class__.__name__
+        
+        if class_name == "ZMQInteractiveShell":
+            # Could be Jupyter Notebook or JupyterLab
+            # Check for JupyterLab specific indicators
+            try:
+                # JupyterLab often has this in the kernel spec
+                import os
+                if 'JUPYTERLAB_DIR' in os.environ or 'JPY_SESSION_NAME' in os.environ:
+                    return "jupyterlab"
+                else:
+                    return "jupyter_notebook"
+            except Exception as _e:
+                return "jupyter_notebook"  # Default to notebook if unsure
+                
+        elif class_name == "TerminalInteractiveShell":
+            return "ipython"
+        else:
+            return "python"
+            
+    except ImportError:
+        return "python"
 
 
 def update_dict_(base, updates):
@@ -133,15 +173,26 @@ def pct(val):
     return "{:.2%}".format(val)
 
 
-def nb(version="5.4.0"):
+def get_eid():
+    return 'echart_' + str(uuid.uuid4()).replace("-", "_")
+
+def nb(version="6.0.0", force: bool=False):
     """
     Inject Javascript to notebook, default using local js.
     This function must be last executed in a cell to produce the Javascript in the output cell
     """
+    env = detect_environment()
+    if env != "jupyter_notebook" and not force:
+        msg = f"`nb()` should only be called in notebook environment, current environment is {env}, use force=True if autodetect result is wrong"
+        logger.warning(msg)
+        return
+    
     from IPython.display import Javascript
 
     url = "https://cdn.jsdelivr.net/npm/echarts@{}/dist/echarts.min".format(version)
     js = Javascript('require.config({paths: {echarts: "%s"}});' % url)
+
+    Echart._repr_javascript_ = _repr_javascript_
     return js
 
 
@@ -165,6 +216,7 @@ class Echart:
         double_precision=3,
         theme="",
         themev4_var=False,
+        jsv='6.0.0',
     ):
         data = data.copy()
         if data.index.name is None:
@@ -194,6 +246,7 @@ class Echart:
         self.height = height
         self.orient = orient
         self.double_precision = double_precision
+        self._jsv = jsv
 
         self.theme = theme
         if themev4_var:
@@ -258,6 +311,10 @@ class Echart:
             self.add_zoomer()
 
     @property
+    def js_url(self):
+        return f'https://cdn.jsdelivr.net/npm/echarts@{self._jsv}/dist/echarts.min.js'
+
+    @property
     def xAxis(self):
         return self._option["xAxis"]
 
@@ -289,7 +346,7 @@ class Echart:
         ]
         self._option["dataZoom"] += option
 
-    def update_component(self, key: str, index: int = None, **kwargs):
+    def update_component(self, key: str, index: int|None = None, **kwargs):
         if key in self._option:
             if index is None:
                 if isinstance(self._option[key], dict):
@@ -737,7 +794,7 @@ class Echart:
 
     def _get_repr_js(self, eid=None):
         if eid is None:
-            eid = str(uuid.uuid4())
+            eid = get_eid()
 
         TEMPLATE = """
         {themev4_expr}
@@ -749,19 +806,6 @@ class Echart:
             themev4_expr=self.themev4_expr, eid=eid, theme=self.theme, option=self.json
         )
 
-    def _repr_javascript_(self):
-        APPEND_ELEMENT = """
-            $('#{eid}').attr('id','{eid}'+'_old');
-            element.append('<div id="{eid}" style="width: {width}px;height:{height}px;page-break-inside: avoid;"></div>');
-        """
-        FUNC_ELEMENT = "require(['echarts'], function(echarts){%s});"
-
-        eid = str(uuid.uuid4())
-        prep = APPEND_ELEMENT.format(eid=eid, width=self.width, height=self.height)
-        content = self._get_repr_js(eid=eid)
-        func = FUNC_ELEMENT % content
-        return "".join([prep, func])
-
     def js(self, eid=None):
         TEMPLATE = '<script type="text/javascript">{}</script>'
         content = self._get_repr_js(eid=eid)
@@ -770,16 +814,91 @@ class Echart:
 
     def div(self, eid=None, width="100%", height="90%"):
         if eid is None:
-            eid = str(uuid.uuid4())
+            eid = get_eid()
         TEMPLATE = '<div id="{eid}" class="ecdf" style="width:{width};height:{height};page-break-inside:avoid;"></div>'
         div = TEMPLATE.format(eid=eid, width=width, height=height)
         script = self.js(eid=eid)
         return "\n".join([div, script])
+    
+    def _repr_html_(self):
+        """HTML representation that works reliably in both environments"""
+        eid = get_eid()
+        
+        return f"""
+        <div id="{eid}" style="width: {self.width}px; height: {self.height}px; page-break-inside: avoid;"></div>
+        <script>
+        (function() {{
+            // Load ECharts if not available
+            function loadEChartsAndRender() {{
+                if (typeof echarts === 'undefined') {{
+                    var script = document.createElement('script');
+                    script.src = '{self.js_url}';
+                    script.onload = function() {{
+                        renderChart();
+                    }};
+                    script.onerror = function() {{
+                        document.getElementById('{eid}').innerHTML = '<p style="color: red;">Failed to load ECharts</p>';
+                    }};
+                    document.head.appendChild(script);
+                }} else {{
+                    renderChart();
+                }}
+            }}
+            
+            function renderChart() {{
+                var container = document.getElementById('{eid}');
+                if (!container) {{
+                    console.error('Chart container not found');
+                    return;
+                }}
+                
+                try {{
+                    {self.themev4_expr}
+                    var myChart = echarts.init(container, '{self.theme}');
+                    var option = {self.json};
+                    myChart.setOption(option);
+                    
+                    // Resize handler
+                    var resizeHandler = function() {{
+                        if (myChart && !myChart.isDisposed()) {{
+                            myChart.resize();
+                        }}
+                    }};
+                    
+                    window.addEventListener('resize', resizeHandler);
+                    
+                    // Also handle parent container resize (for Jupyter)
+                    if (window.ResizeObserver) {{
+                        var resizeObserver = new ResizeObserver(resizeHandler);
+                        resizeObserver.observe(container.parentElement || container);
+                    }}
+                    
+                }} catch (error) {{
+                    console.error('Chart rendering error:', error);
+                    container.innerHTML = '<p style="color: red;">Chart rendering error: ' + error.message + '</p>';
+                }}
+            }}
+            
+            // Start the process
+            loadEChartsAndRender();
+        }})();
+        </script>
+        """
 
-    def display(self, **kwargs):
-        from IPython.core.display import display, Javascript
+def _repr_javascript_(self):
+    eid = get_eid()
 
-        return display(Javascript(self._repr_javascript_(**kwargs)))
+    APPEND_ELEMENT = """
+        $('#{eid}').attr('id','{eid}'+'_old');
+        element.append('<div id="{eid}" style="width: {width}px;height:{height}px;page-break-inside: avoid;"></div>');
+    """
+    FUNC_ELEMENT = "require(['echarts'], function(echarts){%s});"
+
+    prep = APPEND_ELEMENT.format(eid=eid, width=self.width, height=self.height)
+    content = self._get_repr_js(eid=eid)
+    func = FUNC_ELEMENT % content
+    return "".join([prep, func])
+
 
 
 def ecplot(
