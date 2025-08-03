@@ -36,32 +36,34 @@ def detect_environment() -> str:
     try:
         # Check if we're in IPython (base for Jupyter)
         from IPython import get_ipython
+
         ipython = get_ipython()
-        
+
         if ipython is None:
             return "python"
-        
+
         # Check the IPython class name to distinguish environments
         class_name = ipython.__class__.__name__
-        
+
         if class_name == "ZMQInteractiveShell":
             # Could be Jupyter Notebook or JupyterLab
             # Check for JupyterLab specific indicators
             try:
                 # JupyterLab often has this in the kernel spec
                 import os
-                if 'JUPYTERLAB_DIR' in os.environ or 'JPY_SESSION_NAME' in os.environ:
+
+                if "JUPYTERLAB_DIR" in os.environ or "JPY_SESSION_NAME" in os.environ:
                     return "jupyterlab"
                 else:
                     return "jupyter_notebook"
             except Exception as _e:
                 return "jupyter_notebook"  # Default to notebook if unsure
-                
+
         elif class_name == "TerminalInteractiveShell":
             return "ipython"
         else:
             return "python"
-            
+
     except ImportError:
         return "python"
 
@@ -174,9 +176,10 @@ def pct(val):
 
 
 def get_eid():
-    return 'echart_' + str(uuid.uuid4()).replace("-", "_")
+    return "echart_" + str(uuid.uuid4()).replace("-", "_")
 
-def nb(version="6.0.0", force: bool=False):
+
+def nb(version="6.0.0", force: bool = False):
     """
     Inject Javascript to notebook, default using local js.
     This function must be last executed in a cell to produce the Javascript in the output cell
@@ -186,7 +189,7 @@ def nb(version="6.0.0", force: bool=False):
         msg = f"`nb()` should only be called in notebook environment, current environment is {env}, use force=True if autodetect result is wrong"
         logger.warning(msg)
         return
-    
+
     from IPython.display import Javascript
 
     url = "https://cdn.jsdelivr.net/npm/echarts@{}/dist/echarts.min".format(version)
@@ -216,7 +219,7 @@ class Echart:
         double_precision=3,
         theme="",
         themev4_var=False,
-        jsv='6.0.0',
+        jsv="6.0.0",
     ):
         data = data.copy()
         if data.index.name is None:
@@ -312,7 +315,7 @@ class Echart:
 
     @property
     def js_url(self):
-        return f'https://cdn.jsdelivr.net/npm/echarts@{self._jsv}/dist/echarts.min.js'
+        return f"https://cdn.jsdelivr.net/npm/echarts@{self._jsv}/dist/echarts.min.js"
 
     @property
     def xAxis(self):
@@ -346,7 +349,7 @@ class Echart:
         ]
         self._option["dataZoom"] += option
 
-    def update_component(self, key: str, index: int|None = None, **kwargs):
+    def update_component(self, key: str, index: int | None = None, **kwargs):
         if key in self._option:
             if index is None:
                 if isinstance(self._option[key], dict):
@@ -819,11 +822,11 @@ class Echart:
         div = TEMPLATE.format(eid=eid, width=width, height=height)
         script = self.js(eid=eid)
         return "\n".join([div, script])
-    
+
     def _repr_html_(self):
         """HTML representation that works reliably in both environments"""
         eid = get_eid()
-        
+
         return f"""
         <div id="{eid}" style="width: {self.width}px; height: {self.height}px; page-break-inside: avoid;"></div>
         <script>
@@ -885,6 +888,7 @@ class Echart:
         </script>
         """
 
+
 def _repr_javascript_(self):
     eid = get_eid()
 
@@ -900,7 +904,6 @@ def _repr_javascript_(self):
     return "".join([prep, func])
 
 
-
 def ecplot(
     self,
     kind="line",
@@ -912,13 +915,13 @@ def ecplot(
     ytype="value",
     theme="",
     themev4_var=False,
-    secondary_y: str|list[str]|None=None,
+    secondary_y: str | list[str] | None = None,
     **kwargs,
 ):
     secondary_y = secondary_y or []
     if isinstance(secondary_y, str):
         secondary_y = [secondary_y]
-    
+
     ec = Echart(
         self,
         title=title,
@@ -939,6 +942,7 @@ def ecplot(
         ec.plot(kind=kind, y=secondary_y, yAxisIndex=axis, **kwargs)
 
     return ec
+
 
 try:
     if not hasattr(pd.DataFrame, "ecplot"):
